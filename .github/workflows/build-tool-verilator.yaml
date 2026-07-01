@@ -1,4 +1,4 @@
-name: Build and Publish Verilator Image
+name: Build Verilator Images
 
 on:
   push:
@@ -20,6 +20,13 @@ jobs:
       contents: read
       packages: write
 
+    # This matrix defines the version tags you want to build. 
+    # Just add a new string here to create a new version build.
+    strategy:
+      matrix:
+        version: ['v5.048']
+      fail-fast: false
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -34,21 +41,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest
-            type=sha,format=short
-
+      # This is the key matrixed step of the build. The git tag to checkout is
+      # passed via VERILATOR_TAG to the Docker build. The git tag is defined by
+      # the matrix above.
       - name: Build and Push Image
         uses: docker/build-push-action@v7
         with:
           context: tools/verilator
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          build-args: |
+            VERILATOR_TAG=${{ matrix.version }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}
+          cache-from: type=gha,scope=verilator-${{ matrix.version }}
+          cache-to: type=gha,mode=max,scope=verilator-${{ matrix.version }}
